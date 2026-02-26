@@ -1,6 +1,7 @@
-import { CreateDateColumn, Entity, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { CreateDateColumn, Entity, OneToMany, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { StravaToken } from "src/modules/strava/entities/StravaToken.entity";
 import { StravaProfile } from "src/modules/strava/entities/StravaProfile.entity";
+import { StravaActivity } from "src/modules/strava/entities/StravaActivities.entity";
 
 @Entity('users')
 export class User {
@@ -18,4 +19,7 @@ export class User {
 
   @OneToOne(() => StravaProfile, s => s.user, { cascade: true })
   stravaProfile: StravaProfile
+
+  @OneToMany(() => StravaActivity, a => a.user, { cascade: true })
+  stravaActivities: StravaActivity[]
 }
