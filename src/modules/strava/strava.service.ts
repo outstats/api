@@ -213,6 +213,12 @@ export class StravaService {
   }
 
 
+  async getSyncStatus(userId: number): Promise<{ isSynced: boolean }> {
+    const isSynced = await this.stravaProfileRepository.hasBeenSynced(userId)
+    return { isSynced }
+  }
+
+
   handleWebhookEvent(event: StravaWebhookEvent): void {
     if (event.object_type !== 'activity') return
 

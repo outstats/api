@@ -47,6 +47,13 @@ export class StravaController {
   }
 
 
+  @Get('sync-status')
+  @UseGuards(JwtAuthGuard)
+  getSyncStatus(@CurrentUser() user: User): Promise<{ isSynced: boolean }> {
+    return this.stravaService.getSyncStatus(user.id)
+  }
+
+
   @Get('stats')
   @UseGuards(JwtAuthGuard)
   getStats(@CurrentUser() user: User): Promise<ActivityStats> {
