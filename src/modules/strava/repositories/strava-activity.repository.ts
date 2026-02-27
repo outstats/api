@@ -29,7 +29,7 @@ export class StravaActivityRepository {
         [
           'name', 'type', 'category',
           'distance', 'moving_time', 'elapsed_time', 'total_elevation_gain', 'average_speed', 'max_speed',
-          'pr_count', 'kudos_count', 'comment_count', 'athlete_count',
+          'pr_count', 'kudos_count', 'comment_count', 'athlete_count', 'photo_count',
           'workout_type', 'start_date_local', 'timezone'
         ],
         [ 'strava_id' ]
@@ -38,14 +38,13 @@ export class StravaActivityRepository {
   }
 
 
-  async findLatestStravaId(userId: number): Promise<string | null> {
-    const result = await this.repo.findOne({
-      where: { user: { id: userId } },
-      order: { startDateLocal: 'DESC' },
-      select: ['stravaId']
-    })
-    
-    return result?.stravaId ?? null
+  async upsertOne(activity: Partial<StravaActivity>): Promise<void> {
+    await this.upsertMany([activity])
+  }
+
+
+  async deleteByStravaId(stravaId: string): Promise<void> {
+    await this.repo.delete({ stravaId })
   }
 
 

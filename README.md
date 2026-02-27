@@ -1,4 +1,6 @@
 https://developers.strava.com/swagger/swagger.json
+ngrok http 3000 -> l'url publique de ngrok change à chaque démarrage, c'est le plan gratuit
+npx ts-node -r tsconfig-paths/register scripts/register-strava-webhook.ts -> activer les webhooks Strava
 
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>

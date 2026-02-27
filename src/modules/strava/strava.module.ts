@@ -10,11 +10,13 @@ import { StravaProfile } from "./entities/StravaProfile.entity";
 import { StravaActivity } from "./entities/StravaActivities.entity";
 import { StravaController } from "./strava.controller";
 import { StravaActivityRepository } from "./repositories/strava-activity.repository";
+import { UsersModule } from "../users/user.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([StravaToken, StravaProfile, StravaActivity]),
-    ConfigModule.forFeature(stravaConfig)
+    ConfigModule.forFeature(stravaConfig),
+    UsersModule
   ],
   controllers: [StravaController],
   providers: [StravaService, StravaTokenRepository, StravaProfileRepository, StravaActivityRepository],

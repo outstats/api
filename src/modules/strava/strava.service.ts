@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, UnauthorizedException } from "@nestjs/common"
 import type { ConfigType } from "@nestjs/config"
 import { StravaTokenRepository } from "./repositories/strava-token.repository"
-import { StravaActivityType, StravaAthleteProfile, StravaSummaryActivity, StravaTokenResponse } from "./types/strava.types"
+import { StravaActivityType, StravaAthleteProfile, StravaSummaryActivity, StravaTokenResponse, StravaWebhookEvent } from "./types/strava.types"
 import { StravaToken } from "./entities/StravaToken.entity"
 import stravaConfig from "src/config/strava.config"
 import axios from "axios"
@@ -10,6 +10,7 @@ import { User } from "../users/entities/User.entity"
 import { StravaProfile } from "./entities/StravaProfile.entity"
 import { ActivityStats, StravaActivityRepository } from "./repositories/strava-activity.repository"
 import { StravaActivity, toStravaActivityCategory } from "./entities/StravaActivities.entity"
+import { UsersService } from "../users/user.service"
 
 const REFRESH_MARGIN_SECONDS = 5 * 60
 const STRAVA_MAX_PAGE_SIZE = 200
@@ -23,32 +24,9 @@ export class StravaService {
     private readonly config: ConfigType<typeof stravaConfig>,
     private readonly stravaTokenRepository: StravaTokenRepository,
     private readonly stravaProfileRepository: StravaProfileRepository,
-    private readonly stravaActivitiesRepository: StravaActivityRepository
+    private readonly stravaActivitiesRepository: StravaActivityRepository,
+    private readonly usersService: UsersService
   ) {}
-
-
-  async upsertProfile(user: User, athlete: StravaAthleteProfile): Promise<StravaProfile> {
-    let profile = await this.stravaProfileRepository.findByUserId(user.id)
-
-    if (!profile) {
-      profile = this.stravaProfileRepository.create({
-        athleteId: athlete.id,
-        user: { id: user.id } as any
-      })
-    }
-
-    profile.firstName = athlete.firstname
-    profile.lastName = athlete.lastname
-    profile.city = athlete.city
-    profile.state = athlete.state
-    profile.country = athlete.country
-    profile.sex = athlete.sex
-    profile.summit = athlete.summit
-    profile.profilePicture = athlete.profile
-    profile.athleteCreatedAt = athlete.created_at
-
-    return this.stravaProfileRepository.save(profile)
-  }
 
 
   getAuthorizationUrl(scope = 'read,activity:read_all'): string {
@@ -160,69 +138,123 @@ export class StravaService {
   }
 
 
-  async getAthleteProfile(userId: number): Promise<StravaAthleteProfile> {
-    const token = await this.getValidToken(userId)
+  async upsertProfile(user: User, athlete: StravaAthleteProfile): Promise<StravaProfile> {
+    let profile = await this.stravaProfileRepository.findByUserId(user.id)
 
-    const { data } = await axios.get<StravaAthleteProfile>(
-      `${this.config.apiBaseUrl}/athlete`,
-      { headers: { Authorization: `Bearer ${token.accessToken}` } }
-    )
+    if (!profile) {
+      profile = this.stravaProfileRepository.create({
+        athleteId: athlete.id,
+        user: { id: user.id } as any
+      })
+    }
 
-    return data
+    profile.firstName = athlete.firstname
+    profile.lastName = athlete.lastname
+    profile.city = athlete.city
+    profile.state = athlete.state
+    profile.country = athlete.country
+    profile.sex = athlete.sex
+    profile.summit = athlete.summit
+    profile.profilePicture = athlete.profile
+    profile.athleteCreatedAt = athlete.created_at
+
+    return this.stravaProfileRepository.save(profile)
   }
 
 
-  async syncActivities(userId: number): Promise<{ synced: number }> {
+  async syncAllActivities(userId: number): Promise<{ synced: number }> {
     const token = await this.getValidToken(userId)
-
-    const latestActivity = await this.stravaActivitiesRepository.findLatestStravaId(userId)
-    let afterTimestamp: number | undefined
-
-    if (latestActivity) {
-      const existing = await this.stravaActivitiesRepository.findByUserId(userId, 1, 0)
-      if (existing[0]?.startDateLocal) {
-        afterTimestamp = Math.floor(new Date(existing[0].startDateLocal).getTime() / 1000)
-      }
-    }
 
     let page = 1
     let totalSynced = 0
 
     while (true) {
-      const params: Record<string, string | number> = {
-        per_page: STRAVA_MAX_PAGE_SIZE,
-        page
-      }
-
-      if (afterTimestamp) {
-        params.after = afterTimestamp
-      }
-
       const { data: activities } = await axios.get<StravaSummaryActivity[]> (
         `${this.config.apiBaseUrl}/athlete/activities`,
         {
           headers: { Authorization: `Bearer ${token.accessToken}` },
-          params
+          params: { per_page: STRAVA_MAX_PAGE_SIZE, page }
         }
       )
 
       if (!activities.length) break
 
-      const toUpsert: Partial<StravaActivity>[] = activities.map(a =>
-        this.mapApiActivityToEntity(a, userId)
+      await this.stravaActivitiesRepository.upsertMany(
+        activities.map(a => this.mapApiActivityToEntity(a, userId))
       )
 
-      await this.stravaActivitiesRepository.upsertMany(toUpsert)
-
       totalSynced += activities.length
-      this.logger.log(`Synced page ${page} (${activities.length} activities) for unser id=${userId}`)
+      this.logger.log(`Full sync page ${page} (${activities.length} activities) for unser id=${userId}`)
 
       if (activities.length < STRAVA_MAX_PAGE_SIZE) break
-
       page++
     }
 
+    await this.stravaProfileRepository.markActivitiesSynced(userId)
+    this.logger.log(`Full sync complete for user id=${userId}: ${totalSynced} activities`)
+
     return { synced: totalSynced }
+  }
+
+
+  async initialSyncIfNeeded(userId: number): Promise<void> {
+    const alreadySynced = await this.stravaProfileRepository.hasBeenSynced(userId)
+
+    if (alreadySynced) {
+      this.logger.log(`User id=${userId} already synced`)
+      return
+    }
+    
+    this.logger.log(`First login for user id=${userId} >> starting full sync`)
+
+    this.syncAllActivities(userId).catch(e => {
+      this.logger.error(`Initial sync failed for user id=${userId}: ${e.message}`)
+    })
+  }
+
+
+  handleWebhookEvent(event: StravaWebhookEvent): void {
+    if (event.object_type !== 'activity') return
+
+    this.processWebhookEvent(event).catch(e => {
+      this.logger.error(`Webhook processing failed: ${e.message}`, e.stack)
+    })
+  }
+
+
+  private async processWebhookEvent(event: StravaWebhookEvent): Promise<void> {
+    const { aspect_type, object_id, owner_id } = event
+
+    const user = await this.usersService.findByStravaAthleteId(owner_id)
+    if (!user) {
+      this.logger.warn(`Webhook event for unknow athlete id=${owner_id}`)
+      return
+    }
+
+    if (aspect_type === 'delete') {
+      await this.stravaActivitiesRepository.deleteByStravaId(String(object_id))
+      this.logger.log(`Webhook: deleted activity id=${object_id} for user athleteId=${owner_id}`)
+    }
+
+    if (aspect_type === 'create' || aspect_type === 'update') {
+      await this.fetchAndUpsertActivity(user.id, object_id)
+    }
+  }
+
+
+  private async fetchAndUpsertActivity(userId: number, stravaActivityId: number): Promise<void> {
+    const token = await this.getValidToken(userId)
+
+    const { data: activity } = await axios.get<StravaSummaryActivity> (
+      `${this.config.apiBaseUrl}/activities/${stravaActivityId}`,
+      { headers: { Authorization: `Bearer ${token.accessToken}` } }
+    )
+
+    await this.stravaActivitiesRepository.upsertOne(
+      this.mapApiActivityToEntity(activity, userId)
+    )
+
+    this.logger.log(`Webhook: upserted activity id=${stravaActivityId} for user id=${userId}`)
   }
 
 

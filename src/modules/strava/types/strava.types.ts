@@ -43,6 +43,21 @@ export interface StravaSummaryActivity {
   end_latlng: number[]
 }
 
+export interface StravaWebhookEvent {
+  object_type: 'activity' | 'athlete'
+  aspect_type: 'create' | 'update' | 'delete'
+  object_id: number
+  owner_id: number
+  subscription_id: number
+  event_time: number
+  updates: {
+    title?: string
+    type?: string
+    private?: string
+    authorized?: string
+  }
+}
+
 export enum StravaActivityType {
   // Running & Walking
   Run = "Run",

@@ -35,4 +35,23 @@ export class StravaProfileRepository {
   create(partial: Partial<StravaProfile>): StravaProfile {
     return this.repo.create(partial)
   }
+
+
+  async markActivitiesSynced(userId: number): Promise<void> {
+    await this.repo.update(
+      { user: { id: userId } },
+      { activitiesSyncedAt: new Date() }
+    )
+  }
+
+
+  async hasBeenSynced(userId: number): Promise<boolean> {
+    const profile = await this.repo
+      .createQueryBuilder('profile')
+      .select('profile.activitiesSyncedAt')
+      .where('profile.user.id = :userId', { userId })
+      .getOne()
+
+    return profile?.activitiesSyncedAt !== null && profile?.activitiesSyncedAt !== undefined
+  }
 }

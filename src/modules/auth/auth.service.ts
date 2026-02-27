@@ -37,6 +37,8 @@ export class AuthService {
     const fullUser = await this.usersService.findById(user.id)
     const accessToken = this.jwtService.sign({ sub: user.id })
 
+    await this.stravaService.initialSyncIfNeeded(user.id)
+
     return { accessToken, user: fullUser! }
   }
 

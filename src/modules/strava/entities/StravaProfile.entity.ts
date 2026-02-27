@@ -33,6 +33,9 @@ export class StravaProfile {
   @Column({ nullable: true })
   profilePicture: string
 
+  @Column({ type: 'datetime', nullable: true })
+  activitiesSyncedAt: Date | null
+
   @Column({ nullable: true })
   athleteCreatedAt: string
 
