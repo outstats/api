@@ -20,6 +20,29 @@ export interface StravaAthleteProfile {
   created_at: string
 }
 
+export interface StravaSummaryActivity {
+  id: number
+  name: string
+  type: string
+  sport_type: string
+  distance: number
+  moving_time: number
+  elapsed_time: number
+  total_elevation_gain: number
+  average_speed: number
+  max_speed: number
+  kudos_count: number
+  comment_count: number
+  athlete_count: number
+  pr_count: number
+  photo_count: number
+  workout_type: number
+  start_date_local: string
+  timezone: string
+  start_latlng: number[]
+  end_latlng: number[]
+}
+
 export enum StravaActivityType {
   // Running & Walking
   Run = "Run",

@@ -7,13 +7,17 @@ import { StravaService } from "./strava.service";
 import { StravaTokenRepository } from "./repositories/strava-token.repository";
 import { StravaProfileRepository } from "./repositories/strava-profile.repository";
 import { StravaProfile } from "./entities/StravaProfile.entity";
+import { StravaActivity } from "./entities/StravaActivities.entity";
+import { StravaController } from "./strava.controller";
+import { StravaActivityRepository } from "./repositories/strava-activity.repository";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StravaToken, StravaProfile]),
+    TypeOrmModule.forFeature([StravaToken, StravaProfile, StravaActivity]),
     ConfigModule.forFeature(stravaConfig)
   ],
-  providers: [StravaService, StravaTokenRepository, StravaProfileRepository],
+  controllers: [StravaController],
+  providers: [StravaService, StravaTokenRepository, StravaProfileRepository, StravaActivityRepository],
   exports: [StravaService, StravaProfileRepository]
 })
 

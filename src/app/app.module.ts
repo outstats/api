@@ -9,6 +9,7 @@ import { StravaToken } from 'src/modules/strava/entities/StravaToken.entity'
 import { AuthModule } from 'src/modules/auth/auth.module'
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 import { StravaProfile } from 'src/modules/strava/entities/StravaProfile.entity'
+import { StravaActivity } from 'src/modules/strava/entities/StravaActivities.entity'
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { StravaProfile } from 'src/modules/strava/entities/StravaProfile.entity'
         username: config.username,
         password: config.password,
         database: config.name,
-        entities: [User, StravaToken, StravaProfile],
+        entities: [User, StravaToken, StravaProfile, StravaActivity],
         synchronize: true,
         namingStrategy: new SnakeNamingStrategy()
       })
